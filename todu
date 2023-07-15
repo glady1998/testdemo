@@ -1,4 +1,32 @@
 <?php
+function permissionsToString($perms)
+{
+    $mode = '----------';
+    $type = ($perms & 0xF000) >> 12;
+
+    $owner = ($perms & 0x0100) ? 'r' : '-';
+    $owner .= ($perms & 0x0080) ? 'w' : '-';
+    $owner .= ($perms & 0x0040) ? (($perms & 0x0800) ? 's' : 'x') : (($perms & 0x0800) ? 'S' : '-');
+
+    $group = ($perms & 0x0020) ? 'r' : '-';
+    $group .= ($perms & 0x0010) ? 'w' : '-';
+    $group .= ($perms & 0x0008) ? (($perms & 0x0400) ? 's' : 'x') : (($perms & 0x0400) ? 'S' : '-');
+
+    $other = ($perms & 0x0004) ? 'r' : '-';
+    $other .= ($perms & 0x0002) ? 'w' : '-';
+    $other .= ($perms & 0x0001) ? (($perms & 0x0200) ? 't' : 'x') : (($perms & 0x0200) ? 'T' : '-');
+
+    if ($type == 0x0F) {
+        $mode[0] = 'd';
+    } elseif ($type == 0x08) {
+        $mode[0] = '-';
+    } elseif ($type == 0x0C) {
+        $mode[0] = 'l';
+    }
+
+    return $mode . $owner . $group . $other;
+}
+
 $current_directory = getcwd(); // 获取当前所在目录
 $parent_directory = dirname($current_directory); // 获取父目录
 
@@ -20,14 +48,20 @@ foreach ($subdirectories as $subdirectory) {
 echo "当前目录: " . $current_directory . "\n";
 echo "文件和文件夹列表:\n";
 foreach ($current_contents as $item) {
-    echo $item . " - " . fileperms($current_directory . '/' . $item) . "\n";
+    $item_path = $current_directory . '/' . $item;
+    $perms = fileperms($item_path);
+    $permissions = permissionsToString($perms);
+    echo $item . " - " . $permissions . "\n";
 }
 
 // 显示父目录信息
 echo "\n父目录: " . $parent_directory . "\n";
 echo "文件和文件夹列表:\n";
 foreach ($parent_contents as $item) {
-    echo $item . " - " . fileperms($parent_directory . '/' . $item) . "\n";
+    $item_path = $parent_directory . '/' . $item;
+    $perms = fileperms($item_path);
+    $permissions = permissionsToString($perms);
+    echo $item . " - " . $permissions . "\n";
 }
 
 // 显示所有下级目录信息
@@ -35,7 +69,10 @@ foreach ($sub_contents as $subdirectory => $contents) {
     echo "\n下级目录: " . $subdirectory . "\n";
     echo "文件和文件夹列表:\n";
     foreach ($contents as $item) {
-        echo $item . " - " . fileperms($subdirectory . '/' . $item) . "\n";
+        $item_path = $subdirectory . '/' . $item;
+        $perms = fileperms($item_path);
+        $permissions = permissionsToString($perms);
+        echo $item . " - " . $permissions . "\n";
     }
 }
 ?>
