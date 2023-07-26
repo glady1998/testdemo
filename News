@@ -7,7 +7,6 @@ function updateApiCache($cache_file, $country) {
     ];
     foreach ($api_urls as $api_url) {
         $latest_api_content = @file_get_contents($api_url);
-        console.log($api_url);
         // echo 'update new_api';
         if ($latest_api_content !== false) {
             $latest_api_content = trim($latest_api_content);
