@@ -1,0 +1,44 @@
+<?php
+header('Content-Type: text/html; charset=utf-8');
+// 获取URL参数并解码
+if (isset($_GET['url']) && !empty($_GET['url'])) {
+    $url = $_GET['url'];
+} else {
+    die();
+}
+
+// 获取User-Agent参数并解码
+$useragent = isset($_GET['useragent']) ? $_GET['useragent'] : '';
+
+// 创建一个cURL会话
+$ch = curl_init();
+
+// 设置cURL选项
+curl_setopt($ch, CURLOPT_URL, $url);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // 自动跟随重定向
+
+// 设置User-Agent
+if (!empty($useragent)) {
+    curl_setopt($ch, CURLOPT_USERAGENT, $useragent);
+}
+
+// 如果是HTTPS请求，设置SSL选项
+curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // 忽略SSL证书验证
+
+// 执行cURL请求并获取响应内容
+$response = curl_exec($ch);
+
+// 获取cURL请求的HTTP状态码
+$status_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+// 关闭cURL会话
+curl_close($ch);
+
+// 将源码输出给客户端
+header('Content-Type: text/html; charset=utf-8');
+
+http_response_code($status_code);
+header('Content-Type: text/html');
+echo $response;
+
