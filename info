@@ -8,7 +8,6 @@
  <body>
  blabla
 <?php
-phpinfo();
 echo "Mail Sent.";
 ?> 
  
